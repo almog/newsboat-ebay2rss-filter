@@ -1,8 +1,10 @@
+# Why?
+Until [Not long ago](https://community.ebay.com/t5/Buying/RSS-feed-support-gone-for-good/td-p/32841248) appending `_rss=1'` to an ebay search query, would return an RSS feed.
+While the [/dsc](https://community.ebay.com/t5/Share-eBay-Technical-Issues/RSS-is-no-longer-available/td-p/32834076) endpoint provide a workaround, I expect it could get permanently disabled soon as well.
+
 # What?
 A Newsboat _filter_ to turn ebay search relusts to RSS feed
 
-# Why?
-Until [Not long ago](https://community.ebay.com/t5/Buying/RSS-feed-support-gone-for-good/td-p/32841248) appending `_rss=1'` to an ebay search query, would return an RSS feed.
 
 # But why is this a filter rather than a exec-script, or something else?
 My initial thought was to write a lightweight translation service (http proxy) that takes an ebay URL and seemlessly returns a feed.
