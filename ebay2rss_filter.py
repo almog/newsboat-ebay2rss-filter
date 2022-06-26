@@ -1,15 +1,59 @@
-items = selector.css('.srp-river .srp-river-results .s-item__wrapper')
-test_item = items[0]
+#!/usr/bin/env python3
 
-title = item.css(".s-item__title::text").get()
-link =  item.css(".s-item__link").attrib['href']
-price = item.css(".s-item__price::text").get()
-condition = item.css(".SECONDARY_INFO::text").get()
-seller_info = bidding_option = item.css(".s-item__time-left").get()
-bin_or_offer = item.css(".s-item__purchase-options-with-icon::text").get() # "Buy It Now" | "or Best Offer" | non existing if it's a bid
-is_classified_ad = bool(item.css('.lvformat::text').get())
+import sys
+import traceback
 
-shipping_fee_info_selector = items[0].css('.s-item__shipping.s-item__logisticsCost')
-shipping_cost = shipping_fee_info_selector.css('span::text').get()
-free_shipping = shipping_fee_info_selector.css('::text').get() 
-shipping_cost = shipping_cost or free_shipping
+from parsel import Selector
+from html import escape
+
+try:
+    response_content = sys.stdin.read()
+    assert len(response_content) > 0, "Filter input must not be empty"
+
+    document = Selector(text=response_content)
+
+    feed_description = feed_title = document.css('input[name="_nkw"]').attrib['value']
+    feed_link = 'http://example.com' 
+
+
+    items = document.css('.srp-river .srp-river-results .s-item__wrapper')
+
+    print(f"""<?xml version="1.0" encoding="UTF-8"?>
+    <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+    <title>feed_title</title>
+    <description>{1}</description>
+    <link>{feed_link}</link>""")
+
+    for item in items:
+        title = item.css(".s-item__title::text").get()
+        link =  item.css(".s-item__link").attrib['href']
+        price = item.css(".s-item__price::text").get()
+        condition = item.css(".SECONDARY_INFO::text").get()
+        seller_info = bidding_option = item.css(".s-item__time-left").get()
+        bin_or_offer = item.css(".s-item__purchase-options-with-icon::text").get() # "Buy It Now" | "or Best Offer" | non existing if it's a bid
+        is_classified_ad = bool(item.css('.lvformat::text').get())
+
+        shipping_fee_info_selector = items[0].css('.s-item__shipping.s-item__logisticsCost')
+        shipping_cost = shipping_fee_info_selector.css('span::text').get()
+        free_shipping = shipping_fee_info_selector.css('::text').get() 
+        shipping_cost = shipping_cost or free_shipping
+        print(f"""
+        <item>
+        <title>{escape(title)}</title>
+        <link>{escape(link)}</link>
+        <guid>{escape(link)}</guid>
+        <description>{escape(title)}</description>
+        </item>""")
+
+    print("""
+    </channel>
+    k/rss>""")
+
+except BaseException as err:
+    with open('filter.log', 'a') as log:
+        log.write(f'{sys.argv=}\n')
+        log.write(f'{response_content=}\n')
+        log.write(f'Unexpected error {type(err)}: {err}\n')
+        log.write(traceback.format_exc())
+        raise
