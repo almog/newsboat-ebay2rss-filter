@@ -2,18 +2,19 @@
 
 import sys
 import traceback
+import re
 
 from parsel import Selector
 from html import escape
 
 try:
-    response_content = sys.stdin.read()
-    assert len(response_content) > 0, "Filter input must not be empty"
+    text = sys.stdin.read()
+    assert len(text) > 0, "Filter input must not be empty"
 
-    document = Selector(text=response_content)
+    document = Selector(text=text)
 
     feed_description = feed_title = document.css('input[name="_nkw"]').attrib['value']
-    feed_link = 'http://example.com' 
+    feed_link = re.search(r'baseUrl":"(https://.*?")', text).group(1)
 
 
     items = document.css('.srp-river .srp-river-results .s-item__wrapper')
@@ -21,9 +22,9 @@ try:
     print(f"""<?xml version="1.0" encoding="UTF-8"?>
     <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
     <channel>
-    <title>feed_title</title>
-    <description>{1}</description>
-    <link>{feed_link}</link>""")
+    <title>{feed_title}</title>
+    <description>{feed_title}</description>
+    <link>{escape(feed_link)}</link>""")
 
     for item in items:
         title = item.css(".s-item__title::text").get()
