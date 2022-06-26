@@ -52,7 +52,7 @@ try:
     k/rss>""")
 
 except BaseException as err:
-    with open('filter.log', 'a') as log:
+    with open('ebay2rss.log', 'a') as log:
         log.write(f'{sys.argv=}\n')
         log.write(f'{response_content=}\n')
         log.write(f'Unexpected error {type(err)}: {err}\n')
