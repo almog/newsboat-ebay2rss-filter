@@ -50,7 +50,7 @@ try:
 
     print("""
     </channel>
-    k/rss>""")
+    </rss>""")
 
 except BaseException as err:
     with open('ebay2rss.log', 'a') as log:
