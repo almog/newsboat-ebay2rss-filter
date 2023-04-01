@@ -27,8 +27,9 @@ try:
     <link>{escape(feed_link)}</link>""")
 
     for item in items:
-        title = item.css(".s-item__title::text").get()
-        link =  item.css(".s-item__link").attrib['href']
+        title = item.css(".s-item__title span::text").get()
+        link = item.css(".s-item__link").attrib['href']
+        link = re.sub(r"\?.*", "", link)
         # TODO: Add these fields to each item:
         #price = item.css(".s-item__price::text").get()
         #condition = item.css(".SECONDARY_INFO::text").get()
@@ -55,7 +56,6 @@ try:
 except BaseException as err:
     with open('ebay2rss.log', 'a') as log:
         log.write(f'{sys.argv=}\n')
-        log.write(f'{response_content=}\n')
         log.write(f'Unexpected error {type(err)}: {err}\n')
         log.write(traceback.format_exc())
         raise
