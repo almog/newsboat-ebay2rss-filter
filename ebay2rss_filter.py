@@ -27,7 +27,7 @@ try:
     <link>{escape(feed_link)}</link>""")
 
     for item in items:
-        title = item.css(".s-item__title span::text").get()
+        title = item.css(".s-item__title span[role=heading]::text").get()
         link = item.css(".s-item__link").attrib['href']
         link = re.sub(r"\?.*", "", link)
         # TODO: Add these fields to each item:
