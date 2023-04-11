@@ -21,6 +21,13 @@ $ git clone https://github.com/almog/newsboat-ebay2rss-filter/blob/main/ebay2rss
 ```
 "filter:~/.newsboat/newsboat-ebay2rss-filter/ebay2rss_filter.py:https://www.ebay.com/sch/i.html?&_nkw=test"
 ```
+## Migrating existing newsboat `urls` file
+`./migrate_urls <input_file> <filter_path>` transforms any ebay.com `urls` file to work with the ebay2rss filter (output is written to `stdio`)
+
+```
+./migrate_urls ~/.newsboat/urls ~/proj/newsboat-ebay2rss-filter/ebay2rss_filter.py > ./transformed_urls
+```
+Reads a `urls` file, a filter path and writes a new file `./transformed_url`.
 
 ## Logging
 Note that Newsboat filters error log is not written to Newsboat error log, therefore all filter errors are logged to `~/.newsboat/ebay2rss.log`
