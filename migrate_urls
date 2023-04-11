@@ -1,0 +1,49 @@
+#!/usr/bin/env python3
+import re
+import sys
+
+def is_ebay_url(url):
+    return 'ebay.com' in url
+
+def remove_rss_query_string(url):
+    return re.sub(r'&_rss=1', '', url)
+
+def is_comment(line):
+    return line.lstrip().startswith('#')
+
+def is_using_filter(feed_url, filter_path):
+    return feed_url.startswith(f'filter:{filter_path}:')
+
+def convert_file(input_file, filter_path):
+    with open(input_file, 'r') as infile:
+        for line in infile:
+            if is_comment(line):
+                sys.stdout.write(line)
+                continue
+
+            parts = line.strip().split(',', 1)
+            feed_url = parts[0].strip('"')
+            feed_description = parts[1] if len(parts) == 2 else None
+            
+            if is_using_filter(feed_url, filter_path):
+                sys.stdout.write(line)
+                continue
+
+            if is_ebay_url(feed_url):
+                cleaned_url = remove_rss_query_string(feed_url)
+                if feed_description:
+                    new_line = f'"filter:{filter_path}:{cleaned_url}", {feed_description.strip()}\n'
+                else:
+                    new_line = f'"filter:{filter_path}:{cleaned_url}"\n'
+            else:
+                new_line = line
+
+            sys.stdout.write(new_line)
+
+if len(sys.argv) < 3:
+    print(f"Usage: {sys.argv[0]} <input_file> <filter_path>")
+    sys.exit(1)
+
+input_file = sys.argv[1]  # Get input file name from the first command-line argument
+filter_path = sys.argv[2]  # Get filter path from the second command-line argument
+convert_file(input_file, filter_path)
