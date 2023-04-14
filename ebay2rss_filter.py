@@ -12,11 +12,11 @@ try:
     assert len(text) > 0, "Filter input must not be empty"
 
     document = Selector(text=text)
-    no_exact_match_selectors = (
-            'div:contains("We’ve streamlined your search results to show you the best listings.")',
-            'h2:contains("No exact matches found")')
+    no_exact_match_texts = (
+            'We’ve streamlined your search results to show you the best listings',
+            'No exact matches found')
 
-    has_exact_results = all(not document.css(selector) for selector in no_exact_match_selectors) 
+    has_exact_results = all(not document.css(f':contains("{text}")') for text in no_exact_match_texts)
 
     feed_description = feed_title = document.css('input[name="_nkw"]').attrib['value']
     feed_link = re.search(r'baseUrl":"(https://.*?")', text).group(1)
