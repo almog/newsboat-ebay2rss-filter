@@ -12,6 +12,8 @@ try:
     assert len(text) > 0, "Filter input must not be empty"
 
     document = Selector(text=text)
+    assert not document.css('div :contains("There seems to be a problem serving the request at this time")'), "Ebay temporary error page returned"
+
     no_exact_match_texts = (
             'We’ve streamlined your search results to show you the best listings',
             'No exact matches found')
@@ -61,6 +63,6 @@ try:
 except BaseException as err:
     with open('ebay2rss.log', 'a') as log:
         log.write(f'{sys.argv=}\n')
-        log.write(f'Unexpected error {type(err)}: {err}\n')
+        log.write(f'{type(err)}: {err}\n')
         log.write(traceback.format_exc())
         raise
