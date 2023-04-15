@@ -8,18 +8,20 @@ from parsel import Selector
 from html import escape
 
 try:
-    text = sys.stdin.read()
-    assert len(text) > 0, "Filter input must not be empty"
+    raw_html = sys.stdin.read()
+    assert len(raw_html) > 0, "Filter input must not be empty"
 
-    document = Selector(text=text)
-    no_exact_match_selectors = (
-            'div:contains("We’ve streamlined your search results to show you the best listings.")',
-            'h2:contains("No exact matches found")')
+    document = Selector(text=raw_html)
+    assert not document.css('div :contains("There seems to be a problem serving the request at this time")'), "Ebay temporary error page returned"
 
-    has_exact_results = all(not document.css(selector) for selector in no_exact_match_selectors) 
+    no_exact_match_texts = (
+            'We’ve streamlined your search results to show you the best listings',
+            'No exact matches found')
+
+    has_exact_results = all(not document.css(f':contains("{text}")') for text in no_exact_match_texts)
 
     feed_description = feed_title = document.css('input[name="_nkw"]').attrib['value']
-    feed_link = re.search(r'baseUrl":"(https://.*?")', text).group(1)
+    feed_link = re.search(r'baseUrl":"(https://.*?")', raw_html).group(1) #TODO: use the document rather than raw HTML
 
 
     items = document.css('.srp-river .srp-river-results .s-item__wrapper') if has_exact_results else []
@@ -60,7 +62,8 @@ try:
 
 except BaseException as err:
     with open('ebay2rss.log', 'a') as log:
+        log.write(f'{raw_html=}\n')
         log.write(f'{sys.argv=}\n')
-        log.write(f'Unexpected error {type(err)}: {err}\n')
+        log.write(f'{type(err)}: {err}\n')
         log.write(traceback.format_exc())
         raise
