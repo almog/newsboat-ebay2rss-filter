@@ -39,14 +39,16 @@ try:
         raw_html,
         re.DOTALL,
     )
+    items = document.css('li.s-card[data-listingid]') if has_exact_results else []
+    if items and not listings_match:
+        raise ValueError("eBay listing metadata not found")
+
     listing_metadata = json.loads(listings_match.group(1)) if listings_match else []
     promoted_listing_ids = {
         str(listing["itemId"])
         for listing in listing_metadata
         if listing.get("promoted")
     }
-
-    items = document.css('li.s-card[data-listingid]') if has_exact_results else []
 
     print(f"""<?xml version="1.0" encoding="UTF-8"?>
     <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">

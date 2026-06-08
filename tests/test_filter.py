@@ -118,6 +118,28 @@ class FilterTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse((Path(home) / ".newsboat" / "ebay2rss.log").exists())
 
+    def test_rejects_results_without_promotion_metadata(self):
+        html = FIXTURE.read_text(encoding="utf-8").replace(
+            '"listings":',
+            '"removedListings":',
+            1,
+        )
+        with tempfile.TemporaryDirectory() as home:
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "ebay2rss_filter.py")],
+                input=html,
+                text=True,
+                capture_output=True,
+                env={
+                    **os.environ,
+                    "HOME": home,
+                    "PYTHONPATH": os.pathsep.join(sys.path),
+                },
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("eBay listing metadata not found", result.stderr)
+
     def test_rejects_ebay_error_page_with_optimized_python(self):
         html = FIXTURE.read_text(encoding="utf-8").replace(
             "<body>",
