@@ -92,6 +92,32 @@ class FilterTest(unittest.TestCase):
             self.assertNotIn(raw_html, log)
             self.assertIn("Traceback", log)
 
+    def test_does_not_log_keyboard_interrupt(self):
+        with (
+            tempfile.TemporaryDirectory() as home,
+            tempfile.TemporaryDirectory() as modules,
+        ):
+            Path(modules, "parsel.py").write_text(
+                "class Selector:\n"
+                "    def __init__(self, *args, **kwargs):\n"
+                "        raise KeyboardInterrupt\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "ebay2rss_filter.py")],
+                input="<html></html>",
+                text=True,
+                capture_output=True,
+                env={
+                    **os.environ,
+                    "HOME": home,
+                    "PYTHONPATH": os.pathsep.join([modules, *sys.path]),
+                },
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse((Path(home) / ".newsboat" / "ebay2rss.log").exists())
+
     def test_rejects_ebay_error_page_with_optimized_python(self):
         html = FIXTURE.read_text(encoding="utf-8").replace(
             "<body>",

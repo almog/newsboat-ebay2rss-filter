@@ -88,7 +88,7 @@ try:
     </channel>
     </rss>""")
 
-except BaseException as err:
+except Exception as err:
     log_path = Path.home() / ".newsboat" / "ebay2rss.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a", encoding="utf-8") as log:
