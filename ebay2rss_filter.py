@@ -44,6 +44,22 @@ try:
         raise ValueError("eBay listing metadata not found")
 
     listing_metadata = json.loads(listings_match.group(1)) if listings_match else []
+    listing_metadata_ids = {
+        str(listing["itemId"])
+        for listing in listing_metadata
+    }
+    result_listing_ids = {
+        item.attrib["data-listingid"]
+        for item in items
+        if item.css(".s-card__title .su-styled-text::text").get() != "Shop on eBay"
+    }
+    # Assume every result ID is represented in this metadata. If that subset
+    # relationship breaks, eBay's metadata structure or its meaning has changed.
+    missing_listing_ids = result_listing_ids - listing_metadata_ids
+    if missing_listing_ids:
+        missing_listing_id = sorted(missing_listing_ids)[0]
+        raise ValueError(f"eBay listing metadata missing for {missing_listing_id}")
+
     promoted_listing_ids = {
         str(listing["itemId"])
         for listing in listing_metadata
