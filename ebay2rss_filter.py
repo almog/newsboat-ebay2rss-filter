@@ -24,6 +24,11 @@ try:
     feed_description = feed_title = document.css('input[name="_nkw"]').attrib['value']
     feed_link = re.search(r'baseUrl":"(https://.*?)"', raw_html).group(1) #TODO: use the document rather than raw HTML
 
+    # eBay embeds search state in a script shaped like:
+    #   $M_...=(window.$M_...||[]).concat({"...":{"mainSearchContext":{
+    #     "listings":[{"itemId":123, "promoted":true}, ...]}}})
+    # The visible "Sponsored" marker is obfuscated and appears on every card, so
+    # use this listings array as the authoritative promoted flag keyed by ID.
     listings_match = re.search(
         r'"listings"\s*:\s*(\[.*?\])',
         raw_html,
@@ -37,8 +42,6 @@ try:
     }
 
     items = document.css('li.s-card[data-listingid]') if has_exact_results else []
-    if has_exact_results and not items:
-        items = document.css('.srp-river .srp-river-results .s-item__wrapper')
 
     print(f"""<?xml version="1.0" encoding="UTF-8"?>
     <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
@@ -52,12 +55,10 @@ try:
             continue
 
         title = item.css(".s-card__title .su-styled-text::text").get()
-        title = title or item.css(".s-item__title span[role=heading]::text").get()
         if title == "Shop on eBay":
             continue
 
         link = item.css(".s-card__link::attr(href)").get()
-        link = link or item.css(".s-item__link::attr(href)").get()
         link = re.sub(r"\?.*", "", link)
         # TODO: Add these fields to each item:
         #price = item.css(".s-item__price::text").get()

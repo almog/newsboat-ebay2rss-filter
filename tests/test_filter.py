@@ -13,6 +13,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests" / "fixtures" / "current_search_results.html"
+# Quotes make the live query narrower, although eBay can still return a few
+# non-promoted variation listings whose titles do not contain "book".
 LIVE_URL = "https://www.ebay.com/sch/i.html?_nkw=%22book%22&_sacat=0"
 
 
@@ -86,10 +88,12 @@ class LiveFilterTest(unittest.TestCase):
             with urllib.request.urlopen(request, timeout=30) as response:
                 raw_html = response.read().decode("utf-8", errors="replace")
         except urllib.error.HTTPError as error:
+            # Anti-automation responses are environmental, not parser failures.
             if error.code in (403, 429):
                 self.skipTest(f"eBay blocked the live request with HTTP {error.code}")
             raise
         except urllib.error.URLError as error:
+            # Some local Python installations do not trust the system proxy CA.
             if isinstance(error.reason, ssl.SSLCertVerificationError):
                 self.skipTest(f"local TLS verification failed: {error.reason}")
             raise
@@ -107,6 +111,8 @@ class LiveFilterTest(unittest.TestCase):
         self.assertIn("book", channel.findtext("title").lower())
         self.assertGreater(len(items), 0)
 
+        # Read eBay's source metadata independently, then prove that none of the
+        # promoted listing IDs survived conversion into RSS items.
         listings_match = re.search(
             r'"listings"\s*:\s*(\[.*?\])',
             raw_html,

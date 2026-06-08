@@ -38,6 +38,7 @@
         </div>
       </li>
       <li class="s-card s-card--horizontal" data-listingid="100000000002">
+        <!-- This card is marked promoted in the embedded search context below. -->
         <div class="su-card-container su-card-container--horizontal">
           <a
             class="s-card__link"
@@ -53,6 +54,7 @@
         "baseUrl":"https://www.ebay.com/sch/i.html?_nkw=book&_sacat=0&rt=nc"
       };
       window.searchContext = {
+        // eBay's current page associates the promoted flag with each item ID.
         "listings":[
           {"itemId":100000000001,"promoted":false},
           {"itemId":100000000002,"promoted":true}
