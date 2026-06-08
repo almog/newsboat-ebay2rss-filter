@@ -1,12 +1,17 @@
+import os
+import ssl
 import subprocess
 import sys
 import unittest
+import urllib.error
+import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests" / "fixtures" / "current_search_results.html"
+LIVE_URL = "https://www.ebay.com/sch/i.html?_nkw=book&_sacat=0"
 
 
 class FilterTest(unittest.TestCase):
@@ -58,6 +63,51 @@ class FilterTest(unittest.TestCase):
         channel = ET.fromstring(result.stdout).find("channel")
         self.assertEqual(channel.findtext("title"), "books & magazines")
         self.assertEqual(channel.findtext("description"), "books & magazines")
+
+
+@unittest.skipUnless(
+    os.environ.get("EBAY_LIVE_TEST") == "1",
+    "set EBAY_LIVE_TEST=1 to make a real eBay request",
+)
+class LiveFilterTest(unittest.TestCase):
+    def test_converts_live_book_search_results_to_rss(self):
+        request = urllib.request.Request(
+            LIVE_URL,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (X11; Linux x86_64) "
+                    "AppleWebKit/537.36 Chrome/124 Safari/537.36"
+                )
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                raw_html = response.read().decode("utf-8", errors="replace")
+        except urllib.error.HTTPError as error:
+            if error.code in (403, 429):
+                self.skipTest(f"eBay blocked the live request with HTTP {error.code}")
+            raise
+        except urllib.error.URLError as error:
+            if isinstance(error.reason, ssl.SSLCertVerificationError):
+                self.skipTest(f"local TLS verification failed: {error.reason}")
+            raise
+
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "ebay2rss_filter.py")],
+            input=raw_html,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+
+        channel = ET.fromstring(result.stdout).find("channel")
+        items = channel.findall("item")
+        self.assertIn("book", channel.findtext("title").lower())
+        self.assertGreater(len(items), 0)
+        for item in items:
+            self.assertTrue(item.findtext("title"))
+            self.assertIn("/itm/", item.findtext("link"))
+            self.assertEqual(item.findtext("guid"), item.findtext("link"))
 
 
 if __name__ == "__main__":
