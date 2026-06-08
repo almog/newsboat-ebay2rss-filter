@@ -88,6 +88,32 @@ class FilterTest(unittest.TestCase):
             log_path = Path(home) / ".newsboat" / "ebay2rss.log"
             self.assertTrue(log_path.exists())
 
+    def test_rejects_ebay_error_page_with_optimized_python(self):
+        html = FIXTURE.read_text(encoding="utf-8").replace(
+            "<body>",
+            (
+                "<body><div><span>"
+                "There seems to be a problem serving the request at this time"
+                "</span></div>"
+            ),
+            1,
+        )
+        with tempfile.TemporaryDirectory() as home:
+            result = subprocess.run(
+                [sys.executable, "-O", str(ROOT / "ebay2rss_filter.py")],
+                input=html,
+                text=True,
+                capture_output=True,
+                env={
+                    **os.environ,
+                    "HOME": home,
+                    "PYTHONPATH": os.pathsep.join(sys.path),
+                },
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Ebay temporary error page returned", result.stderr)
+
 
 @unittest.skipUnless(
     os.environ.get("EBAY_LIVE_TEST") == "1",

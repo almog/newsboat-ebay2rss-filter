@@ -11,10 +11,14 @@ from html import escape
 
 try:
     raw_html = sys.stdin.read()
-    assert len(raw_html) > 0, "Filter input must not be empty"
+    if not raw_html:
+        raise ValueError("Filter input must not be empty")
 
     document = Selector(text=raw_html)
-    assert not document.css('div :contains("There seems to be a problem serving the request at this time")'), "Ebay temporary error page returned"
+    if document.css(
+        'div :contains("There seems to be a problem serving the request at this time")'
+    ):
+        raise ValueError("Ebay temporary error page returned")
 
     no_exact_match_texts = (
             'We’ve streamlined your search results to show you the best listings',
