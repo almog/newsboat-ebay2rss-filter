@@ -165,6 +165,33 @@ class FilterTest(unittest.TestCase):
                 result.stderr,
             )
 
+    def test_rejects_incomplete_result_before_emitting_rss(self):
+        html = FIXTURE.read_text(encoding="utf-8").replace(
+            'href="https://www.ebay.com/itm/100000000001?'
+            '_skw=book&amp;tracking=fake"',
+            'data-missing-href=""',
+            1,
+        )
+        with tempfile.TemporaryDirectory() as home:
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "ebay2rss_filter.py")],
+                input=html,
+                text=True,
+                capture_output=True,
+                env={
+                    **os.environ,
+                    "HOME": home,
+                    "PYTHONPATH": os.pathsep.join(sys.path),
+                },
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(result.stdout, "")
+            self.assertIn(
+                "eBay result 100000000001 has no link",
+                result.stderr,
+            )
+
     def test_rejects_ebay_error_page_with_optimized_python(self):
         html = FIXTURE.read_text(encoding="utf-8").replace(
             "<body>",

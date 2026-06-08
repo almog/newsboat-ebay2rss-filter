@@ -66,22 +66,21 @@ try:
         if listing.get("promoted")
     }
 
-    print(f"""<?xml version="1.0" encoding="UTF-8"?>
-    <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
-    <channel>
-    <title>{escape(feed_title)}</title>
-    <description>{escape(feed_title)}</description>
-    <link>{escape(feed_link)}</link>""")
-
+    feed_items = []
     for item in items:
-        if item.attrib.get("data-listingid") in promoted_listing_ids:
+        listing_id = item.attrib["data-listingid"]
+        if listing_id in promoted_listing_ids:
             continue
 
         title = item.css(".s-card__title .su-styled-text::text").get()
         if title == "Shop on eBay":
             continue
+        if not title:
+            raise ValueError(f"eBay result {listing_id} has no title")
 
         link = item.css(".s-card__link::attr(href)").get()
+        if not link:
+            raise ValueError(f"eBay result {listing_id} has no link")
         link = re.sub(r"\?.*", "", link)
         # TODO: Add these fields to each item:
         #price = item.css(".s-item__price::text").get()
@@ -94,6 +93,16 @@ try:
         #shipping_cost = shipping_fee_info_selector.css('span::text').get()
         #free_shipping = shipping_fee_info_selector.css('::text').get() 
         #shipping_cost = shipping_cost or free_shipping
+        feed_items.append((title, link))
+
+    print(f"""<?xml version="1.0" encoding="UTF-8"?>
+    <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+    <title>{escape(feed_title)}</title>
+    <description>{escape(feed_title)}</description>
+    <link>{escape(feed_link)}</link>""")
+
+    for title, link in feed_items:
         print(f"""
         <item>
         <title>{escape(title)}</title>
