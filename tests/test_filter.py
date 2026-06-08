@@ -4,6 +4,7 @@ import re
 import ssl
 import subprocess
 import sys
+import tempfile
 import unittest
 import urllib.error
 import urllib.request
@@ -67,6 +68,25 @@ class FilterTest(unittest.TestCase):
         channel = ET.fromstring(result.stdout).find("channel")
         self.assertEqual(channel.findtext("title"), "books & magazines")
         self.assertEqual(channel.findtext("description"), "books & magazines")
+
+    def test_logs_errors_to_newsboat_directory(self):
+        with tempfile.TemporaryDirectory() as home:
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "ebay2rss_filter.py")],
+                input="",
+                text=True,
+                capture_output=True,
+                cwd=home,
+                env={
+                    **os.environ,
+                    "HOME": home,
+                    "PYTHONPATH": os.pathsep.join(sys.path),
+                },
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            log_path = Path(home) / ".newsboat" / "ebay2rss.log"
+            self.assertTrue(log_path.exists())
 
 
 @unittest.skipUnless(
