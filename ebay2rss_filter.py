@@ -92,7 +92,6 @@ except BaseException as err:
     log_path = Path.home() / ".newsboat" / "ebay2rss.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a", encoding="utf-8") as log:
-        log.write(f'{raw_html=}\n')
         log.write(f'{sys.argv=}\n')
         log.write(f'{type(err)}: {err}\n')
         log.write(traceback.format_exc())

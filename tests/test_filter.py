@@ -71,9 +71,10 @@ class FilterTest(unittest.TestCase):
 
     def test_logs_errors_to_newsboat_directory(self):
         with tempfile.TemporaryDirectory() as home:
+            raw_html = "response body must not be logged"
             result = subprocess.run(
                 [sys.executable, str(ROOT / "ebay2rss_filter.py")],
-                input="",
+                input=raw_html,
                 text=True,
                 capture_output=True,
                 cwd=home,
@@ -87,6 +88,9 @@ class FilterTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             log_path = Path(home) / ".newsboat" / "ebay2rss.log"
             self.assertTrue(log_path.exists())
+            log = log_path.read_text(encoding="utf-8")
+            self.assertNotIn(raw_html, log)
+            self.assertIn("Traceback", log)
 
     def test_rejects_ebay_error_page_with_optimized_python(self):
         html = FIXTURE.read_text(encoding="utf-8").replace(
