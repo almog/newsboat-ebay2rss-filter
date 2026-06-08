@@ -42,6 +42,23 @@ class FilterTest(unittest.TestCase):
             items[0].findtext("description"), items[0].findtext("title")
         )
 
+    def test_escapes_search_query_in_channel_metadata(self):
+        html = FIXTURE.read_text(encoding="utf-8").replace(
+            'name="_nkw" value="book"',
+            'name="_nkw" value="books &amp; magazines"',
+        )
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "ebay2rss_filter.py")],
+            input=html,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+
+        channel = ET.fromstring(result.stdout).find("channel")
+        self.assertEqual(channel.findtext("title"), "books & magazines")
+        self.assertEqual(channel.findtext("description"), "books & magazines")
+
 
 if __name__ == "__main__":
     unittest.main()
