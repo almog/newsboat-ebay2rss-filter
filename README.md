@@ -33,3 +33,16 @@ Reads a `urls` file, a filter path and writes a new file `./transformed_url`.
 
 ## Logging
 Note that Newsboat filters error log is not written to Newsboat error log, the filter however logs all errors to `~/.newsboat/ebay2rss.log` directly.
+
+## Testing
+Run the deterministic test suite with:
+
+```
+python3 -m unittest discover -s tests -v
+```
+
+The live test makes a real request to eBay and is disabled by default:
+
+```
+EBAY_LIVE_TEST=1 python3 -m unittest tests.test_filter.LiveFilterTest -v
+```
