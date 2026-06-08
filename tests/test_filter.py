@@ -26,10 +26,9 @@ class FilterTest(unittest.TestCase):
         self.assertEqual(root.tag, "rss")
         self.assertEqual(channel.findtext("title"), "book")
         self.assertEqual(channel.findtext("description"), "book")
-        self.assertTrue(
-            channel.findtext("link").startswith(
-                "https://www.ebay.com/sch/i.html?_nkw=book"
-            )
+        self.assertEqual(
+            channel.findtext("link"),
+            "https://www.ebay.com/sch/i.html?_nkw=book&_sacat=0&rt=nc",
         )
         self.assertEqual(len(items), 1)
         self.assertEqual(

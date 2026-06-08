@@ -21,7 +21,7 @@ try:
     has_exact_results = all(not document.css(f':contains("{text}")') for text in no_exact_match_texts)
 
     feed_description = feed_title = document.css('input[name="_nkw"]').attrib['value']
-    feed_link = re.search(r'baseUrl":"(https://.*?")', raw_html).group(1) #TODO: use the document rather than raw HTML
+    feed_link = re.search(r'baseUrl":"(https://.*?)"', raw_html).group(1) #TODO: use the document rather than raw HTML
 
 
     items = document.css('li.s-card[data-listingid]') if has_exact_results else []
