@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import json
 import sys
 import traceback
 import re
@@ -23,6 +24,17 @@ try:
     feed_description = feed_title = document.css('input[name="_nkw"]').attrib['value']
     feed_link = re.search(r'baseUrl":"(https://.*?)"', raw_html).group(1) #TODO: use the document rather than raw HTML
 
+    listings_match = re.search(
+        r'"listings"\s*:\s*(\[.*?\])',
+        raw_html,
+        re.DOTALL,
+    )
+    listing_metadata = json.loads(listings_match.group(1)) if listings_match else []
+    promoted_listing_ids = {
+        str(listing["itemId"])
+        for listing in listing_metadata
+        if listing.get("promoted")
+    }
 
     items = document.css('li.s-card[data-listingid]') if has_exact_results else []
     if has_exact_results and not items:
@@ -36,6 +48,9 @@ try:
     <link>{escape(feed_link)}</link>""")
 
     for item in items:
+        if item.attrib.get("data-listingid") in promoted_listing_ids:
+            continue
+
         title = item.css(".s-card__title .su-styled-text::text").get()
         title = title or item.css(".s-item__title span[role=heading]::text").get()
         if title == "Shop on eBay":

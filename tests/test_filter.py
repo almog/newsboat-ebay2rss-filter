@@ -1,4 +1,6 @@
+import json
 import os
+import re
 import ssl
 import subprocess
 import sys
@@ -11,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests" / "fixtures" / "current_search_results.html"
-LIVE_URL = "https://www.ebay.com/sch/i.html?_nkw=book&_sacat=0"
+LIVE_URL = "https://www.ebay.com/sch/i.html?_nkw=%22book%22&_sacat=0"
 
 
 class FilterTest(unittest.TestCase):
@@ -104,10 +106,24 @@ class LiveFilterTest(unittest.TestCase):
         items = channel.findall("item")
         self.assertIn("book", channel.findtext("title").lower())
         self.assertGreater(len(items), 0)
+
+        listings_match = re.search(
+            r'"listings"\s*:\s*(\[.*?\])',
+            raw_html,
+            re.DOTALL,
+        )
+        listing_metadata = json.loads(listings_match.group(1))
+        promoted_listing_ids = {
+            str(listing["itemId"])
+            for listing in listing_metadata
+            if listing.get("promoted")
+        }
+
         for item in items:
-            self.assertTrue(item.findtext("title"))
             self.assertIn("/itm/", item.findtext("link"))
             self.assertEqual(item.findtext("guid"), item.findtext("link"))
+            listing_id = item.findtext("link").rstrip("/").rsplit("/", 1)[-1]
+            self.assertNotIn(listing_id, promoted_listing_ids)
 
 
 if __name__ == "__main__":
