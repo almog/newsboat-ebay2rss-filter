@@ -15,7 +15,7 @@ And with that in mind, by using a filter (rather than exec script), I let Snowbo
 # Usage
 ```
 $ pip install parsel
-$ git clone https://github.com/almog/newsboat-ebay2rss-filter/blob/main/ebay2rss_filter.py
+$ git clone https://github.com/almog/newsboat-ebay2rss-filter.git
 
 ```
 
