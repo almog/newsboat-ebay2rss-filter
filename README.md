@@ -23,7 +23,7 @@ $ pip install -r requirements.txt
 
 ## Simple search query:
 ```
-"filter:~/<eaby2rss-path>/ebay2rss_filter.py:https://www.ebay.com/sch/i.html?&_nkw=test"
+"filter:~/<ebay2rss-path>/ebay2rss_filter.py:https://www.ebay.com/sch/i.html?_nkw=test"
 ```
 
 ## Logging
