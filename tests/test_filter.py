@@ -14,6 +14,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests" / "fixtures" / "current_search_results.html"
+NO_EXACT_MATCHES_FIXTURE = (
+    ROOT / "tests" / "fixtures" / "current_no_exact_matches.html"
+)
 # Quotes make the live query narrower, although eBay can still return a few
 # non-promoted variation listings whose titles do not contain "book".
 LIVE_URL = "https://www.ebay.com/sch/i.html?_nkw=%22book%22&_sacat=0"
@@ -51,6 +54,22 @@ class FilterTest(unittest.TestCase):
         self.assertEqual(
             items[0].findtext("description"), items[0].findtext("title")
         )
+
+    def test_excludes_suggested_results_when_no_exact_matches_exist(self):
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "ebay2rss_filter.py")],
+            input=NO_EXACT_MATCHES_FIXTURE.read_text(encoding="utf-8"),
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+
+        channel = ET.fromstring(result.stdout).find("channel")
+        self.assertEqual(
+            channel.findtext("title"),
+            '"ultraviolet accordion teacup qzjxk"',
+        )
+        self.assertEqual(channel.findall("item"), [])
 
     def test_escapes_search_query_in_channel_metadata(self):
         html = FIXTURE.read_text(encoding="utf-8").replace(
