@@ -41,7 +41,8 @@ Run the deterministic test suite with:
 python3 -m unittest discover -s tests -v
 ```
 
-The live test makes a real request to eBay and is disabled by default:
+The live test makes real requests to eBay and is disabled by default. It first
+visits the eBay homepage to establish a browser-like session:
 
 ```
 EBAY_LIVE_TEST=1 python3 -m unittest tests.test_filter.LiveFilterTest -v

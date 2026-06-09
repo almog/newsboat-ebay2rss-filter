@@ -1,3 +1,4 @@
+import http.cookiejar
 import json
 import os
 import re
@@ -5,6 +6,7 @@ import ssl
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 import urllib.error
 import urllib.request
@@ -24,6 +26,15 @@ LIVE_NO_EXACT_MATCHES_URL = (
     "https://www.ebay.com/sch/i.html?"
     "_nkw=%22ultraviolet+accordion+teacup+qzjxk%22&_sacat=0"
 )
+LIVE_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/137.0.0.0 Safari/537.36"
+)
+
+
+class EbayRequestBlocked(Exception):
+    pass
 
 
 class FilterTest(unittest.TestCase):
@@ -247,29 +258,69 @@ class FilterTest(unittest.TestCase):
     "set EBAY_LIVE_TEST=1 to make a real eBay request",
 )
 class LiveFilterTest(unittest.TestCase):
-    def fetch_ebay_search(self, url):
-        request = urllib.request.Request(
-            url,
-            headers={
-                "User-Agent": (
-                    "Mozilla/5.0 (X11; Linux x86_64) "
-                    "AppleWebKit/537.36 Chrome/124 Safari/537.36"
-                )
-            },
+    def build_opener(self):
+        system_ca = Path("/etc/ssl/cert.pem")
+        if (
+            sys.platform == "darwin"
+            and "SSL_CERT_FILE" not in os.environ
+            and system_ca.exists()
+        ):
+            ssl_context = ssl.create_default_context(cafile=system_ca)
+        else:
+            ssl_context = ssl.create_default_context()
+
+        return urllib.request.build_opener(
+            urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()),
+            urllib.request.HTTPSHandler(context=ssl_context),
         )
+
+    def fetch_page(self, opener, url, referer=None):
+        headers = {
+            "User-Agent": LIVE_USER_AGENT,
+            "Accept": (
+                "text/html,application/xhtml+xml,application/xml;q=0.9,"
+                "image/avif,image/webp,image/apng,*/*;q=0.8"
+            ),
+            "Accept-Language": "en-US,en;q=0.9",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "same-origin" if referer else "none",
+            "Upgrade-Insecure-Requests": "1",
+        }
+        if referer:
+            headers["Referer"] = referer
+
         try:
-            with urllib.request.urlopen(request, timeout=30) as response:
+            request = urllib.request.Request(url, headers=headers)
+            with opener.open(request, timeout=30) as response:
+                if "/splashui/challenge" in response.url:
+                    raise EbayRequestBlocked("eBay challenged the live request")
                 return response.read().decode("utf-8", errors="replace")
         except urllib.error.HTTPError as error:
-            # Anti-automation responses are environmental, not parser failures.
             if error.code in (403, 429):
-                self.skipTest(f"eBay blocked the live request with HTTP {error.code}")
+                raise EbayRequestBlocked(
+                    f"eBay blocked the live request with HTTP {error.code}"
+                ) from error
             raise
         except urllib.error.URLError as error:
-            # Some local Python installations do not trust the system proxy CA.
             if isinstance(error.reason, ssl.SSLCertVerificationError):
                 self.skipTest(f"local TLS verification failed: {error.reason}")
             raise
+
+    def fetch_ebay_search(self, url):
+        for attempt in range(2):
+            opener = self.build_opener()
+            try:
+                self.fetch_page(opener, "https://www.ebay.com/")
+                return self.fetch_page(
+                    opener,
+                    url,
+                    referer="https://www.ebay.com/",
+                )
+            except EbayRequestBlocked as error:
+                if attempt == 1:
+                    self.skipTest(str(error))
+                time.sleep(5)
 
     def run_filter(self, raw_html):
         return subprocess.run(
