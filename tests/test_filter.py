@@ -38,6 +38,20 @@ class EbayRequestBlocked(Exception):
 
 
 class FilterTest(unittest.TestCase):
+    def run_filter_with_isolated_home(self, raw_html):
+        with tempfile.TemporaryDirectory() as home:
+            return subprocess.run(
+                [sys.executable, str(ROOT / "ebay2rss_filter.py")],
+                input=raw_html,
+                text=True,
+                capture_output=True,
+                env={
+                    **os.environ,
+                    "HOME": home,
+                    "PYTHONPATH": os.pathsep.join(sys.path),
+                },
+            )
+
     def test_converts_current_search_results_to_rss(self):
         result = subprocess.run(
             [sys.executable, str(ROOT / "ebay2rss_filter.py")],
@@ -203,6 +217,64 @@ class FilterTest(unittest.TestCase):
         channel = ET.fromstring(result.stdout).find("channel")
         self.assertEqual(channel.findtext("title"), "books & magazines")
         self.assertEqual(channel.findtext("description"), "books & magazines")
+
+    def test_rejects_missing_search_base_url(self):
+        html = FIXTURE.read_text(encoding="utf-8").replace(
+            '"baseUrl"',
+            '"removedBaseUrl"',
+            1,
+        )
+        result = self.run_filter_with_isolated_home(html)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("eBay search baseUrl not found", result.stderr)
+
+    def test_rejects_non_string_search_base_url(self):
+        html = FIXTURE.read_text(encoding="utf-8").replace(
+            (
+                '"baseUrl":'
+                '"https://www.ebay.com/sch/i.html?'
+                '_nkw=book&_sacat=0&rt=nc"'
+            ),
+            '"baseUrl":123',
+            1,
+        )
+        result = self.run_filter_with_isolated_home(html)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
+        self.assertIn(
+            "eBay search baseUrl must be a JSON string",
+            result.stderr,
+        )
+
+    def test_rejects_invalid_search_base_url(self):
+        valid_url = (
+            "https://www.ebay.com/sch/i.html?"
+            "_nkw=book&_sacat=0&rt=nc"
+        )
+        invalid_urls = (
+            "http://www.ebay.com/sch/i.html?_nkw=book",
+            "https://example.com/sch/i.html?_nkw=book",
+            "https://www.ebay.com/itm/100000000001",
+        )
+
+        for invalid_url in invalid_urls:
+            with self.subTest(url=invalid_url):
+                html = FIXTURE.read_text(encoding="utf-8").replace(
+                    valid_url,
+                    invalid_url,
+                    1,
+                )
+                result = self.run_filter_with_isolated_home(html)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(result.stdout, "")
+                self.assertIn(
+                    "eBay search baseUrl is not an eBay search URL",
+                    result.stderr,
+                )
 
     def test_logs_errors_to_newsboat_directory(self):
         with tempfile.TemporaryDirectory() as home:

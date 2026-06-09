@@ -5,6 +5,7 @@ import sys
 import traceback
 import re
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from parsel import Selector
 from html import escape
@@ -15,6 +16,27 @@ SHIPPING_TERMS = (
     "delivery",
     "postage",
 )
+
+
+def extract_feed_link(raw_html):
+    base_url_match = re.search(
+        r'"baseUrl"\s*:\s*("(?:\\.|[^"\\])*")',
+        raw_html,
+    )
+    if not base_url_match:
+        if re.search(r'"baseUrl"\s*:', raw_html):
+            raise ValueError("eBay search baseUrl must be a JSON string")
+        raise ValueError("eBay search baseUrl not found")
+
+    feed_link = json.loads(base_url_match.group(1))
+    parsed_link = urlsplit(feed_link)
+    if (
+        parsed_link.scheme != "https"
+        or parsed_link.netloc.lower() != "www.ebay.com"
+        or parsed_link.path != "/sch/i.html"
+    ):
+        raise ValueError("eBay search baseUrl is not an eBay search URL")
+    return feed_link
 
 
 def normalized_text(selector):
@@ -128,7 +150,7 @@ try:
     has_exact_results = all(not document.css(f':contains("{text}")') for text in no_exact_match_texts)
 
     feed_description = feed_title = document.css('input[name="_nkw"]').attrib['value']
-    feed_link = re.search(r'baseUrl":"(https://.*?)"', raw_html).group(1) #TODO: use the document rather than raw HTML
+    feed_link = extract_feed_link(raw_html)
 
     # eBay embeds search state in a script shaped like:
     #   $M_...=(window.$M_...||[]).concat({"...":{"mainSearchContext":{
