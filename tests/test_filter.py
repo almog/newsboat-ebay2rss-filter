@@ -20,6 +20,10 @@ NO_EXACT_MATCHES_FIXTURE = (
 # Quotes make the live query narrower, although eBay can still return a few
 # non-promoted variation listings whose titles do not contain "book".
 LIVE_URL = "https://www.ebay.com/sch/i.html?_nkw=%22book%22&_sacat=0"
+LIVE_NO_EXACT_MATCHES_URL = (
+    "https://www.ebay.com/sch/i.html?"
+    "_nkw=%22ultraviolet+accordion+teacup+qzjxk%22&_sacat=0"
+)
 
 
 class FilterTest(unittest.TestCase):
@@ -243,9 +247,9 @@ class FilterTest(unittest.TestCase):
     "set EBAY_LIVE_TEST=1 to make a real eBay request",
 )
 class LiveFilterTest(unittest.TestCase):
-    def test_converts_live_book_search_results_to_rss(self):
+    def fetch_ebay_search(self, url):
         request = urllib.request.Request(
-            LIVE_URL,
+            url,
             headers={
                 "User-Agent": (
                     "Mozilla/5.0 (X11; Linux x86_64) "
@@ -255,7 +259,7 @@ class LiveFilterTest(unittest.TestCase):
         )
         try:
             with urllib.request.urlopen(request, timeout=30) as response:
-                raw_html = response.read().decode("utf-8", errors="replace")
+                return response.read().decode("utf-8", errors="replace")
         except urllib.error.HTTPError as error:
             # Anti-automation responses are environmental, not parser failures.
             if error.code in (403, 429):
@@ -267,13 +271,18 @@ class LiveFilterTest(unittest.TestCase):
                 self.skipTest(f"local TLS verification failed: {error.reason}")
             raise
 
-        result = subprocess.run(
+    def run_filter(self, raw_html):
+        return subprocess.run(
             [sys.executable, str(ROOT / "ebay2rss_filter.py")],
             input=raw_html,
             text=True,
             capture_output=True,
             check=True,
         )
+
+    def test_converts_live_book_search_results_to_rss(self):
+        raw_html = self.fetch_ebay_search(LIVE_URL)
+        result = self.run_filter(raw_html)
 
         channel = ET.fromstring(result.stdout).find("channel")
         items = channel.findall("item")
@@ -299,6 +308,13 @@ class LiveFilterTest(unittest.TestCase):
             self.assertEqual(item.findtext("guid"), item.findtext("link"))
             listing_id = item.findtext("link").rstrip("/").rsplit("/", 1)[-1]
             self.assertNotIn(listing_id, promoted_listing_ids)
+
+    def test_excludes_live_suggested_results_when_no_exact_matches_exist(self):
+        raw_html = self.fetch_ebay_search(LIVE_NO_EXACT_MATCHES_URL)
+        self.assertIn("No exact matches found", raw_html)
+
+        channel = ET.fromstring(self.run_filter(raw_html).stdout).find("channel")
+        self.assertEqual(channel.findall("item"), [])
 
 
 if __name__ == "__main__":
