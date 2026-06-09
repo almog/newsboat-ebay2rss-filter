@@ -9,6 +9,107 @@ from pathlib import Path
 from parsel import Selector
 from html import escape
 
+
+SHIPPING_TERMS = (
+    "shipping",
+    "delivery",
+    "postage",
+)
+
+
+def normalized_text(selector):
+    text = " ".join(selector.css("::text").getall())
+    return " ".join(text.split())
+
+
+def is_shipping_detail(text):
+    return any(term in text.lower() for term in SHIPPING_TERMS)
+
+
+def extract_listing_type(item, listing_id):
+    attributes = normalized_text(
+        item.css(".su-card-container__attributes__primary")
+    )
+    if not attributes:
+        raise ValueError(f"eBay result {listing_id} has no listing type")
+
+    attributes = attributes.lower()
+    has_bid = "time left" in attributes
+    has_best_offer = "best offer" in attributes
+    has_buy_it_now = "buy it now" in attributes or (
+        has_best_offer and not has_bid
+    )
+
+    listing_types = []
+    if has_bid:
+        listing_types.append("Bid")
+    if has_buy_it_now:
+        listing_types.append("Buy It Now")
+    if has_best_offer:
+        listing_types.append("Best Offer")
+    if not listing_types:
+        raise ValueError(f"eBay result {listing_id} has no listing type")
+    return " · ".join(listing_types)
+
+
+def extract_condition(item, listing_id):
+    subtitle_rows = item.css(".s-card__subtitle-row")
+    if not subtitle_rows:
+        # Some listings genuinely omit condition from eBay search results.
+        return None
+
+    # Promotional subtitles may precede the condition, which is the final row.
+    condition_elements = subtitle_rows[-1].css(
+        ".s-card__subtitle .su-styled-text"
+    )
+    if not condition_elements:
+        raise ValueError(f"eBay result {listing_id} has malformed condition")
+
+    condition = normalized_text(condition_elements[0])
+    if not condition:
+        raise ValueError(f"eBay result {listing_id} has empty condition")
+    return condition.rstrip(" ·")
+
+
+def extract_listing_details(item, listing_id):
+    attribute_rows = item.css(
+        ".su-card-container__attributes__primary "
+        "> .s-card__attribute-row"
+    )
+    attribute_texts = []
+    for row in attribute_rows:
+        text = normalized_text(row)
+        if not text:
+            raise ValueError(f"eBay result {listing_id} has an empty attribute")
+        attribute_texts.append(text)
+
+    shipping = next(
+        (text for text in attribute_texts if is_shipping_detail(text)),
+        None,
+    )
+    price = normalized_text(item.css(".s-card__price"))
+    if not price:
+        raise ValueError(f"eBay result {listing_id} has no price")
+
+    return {
+        "Price": price,
+        "Condition": extract_condition(item, listing_id),
+        "Listing type": extract_listing_type(item, listing_id),
+        # Digital listings can legitimately omit shipping from search results.
+        "Shipping": shipping,
+    }
+
+
+def format_item_description(title, details):
+    lines = [title]
+    lines.extend(
+        f"{label}: {value}"
+        for label, value in details.items()
+        if value
+    )
+    return "\n".join(lines)
+
+
 try:
     raw_html = sys.stdin.read()
     if not raw_html:
@@ -82,18 +183,12 @@ try:
         if not link:
             raise ValueError(f"eBay result {listing_id} has no link")
         link = re.sub(r"\?.*", "", link)
-        # TODO: Add these fields to each item:
-        #price = item.css(".s-item__price::text").get()
-        #condition = item.css(".SECONDARY_INFO::text").get()
-        #seller_info = bidding_option = item.css(".s-item__time-left").get()
-        #bin_or_offer = item.css(".s-item__purchase-options-with-icon::text").get() # "Buy It Now" | "or Best Offer" | non existing if it's a bid
-        #is_classified_ad = bool(item.css('.lvformat::text').get())
 
-        #shipping_fee_info_selector = items[0].css('.s-item__shipping.s-item__logisticsCost')
-        #shipping_cost = shipping_fee_info_selector.css('span::text').get()
-        #free_shipping = shipping_fee_info_selector.css('::text').get() 
-        #shipping_cost = shipping_cost or free_shipping
-        feed_items.append((title, link))
+        description = format_item_description(
+            title,
+            extract_listing_details(item, listing_id),
+        )
+        feed_items.append((title, link, description))
 
     print(f"""<?xml version="1.0" encoding="UTF-8"?>
     <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
@@ -102,13 +197,13 @@ try:
     <description>{escape(feed_title)}</description>
     <link>{escape(feed_link)}</link>""")
 
-    for title, link in feed_items:
+    for title, link, description in feed_items:
         print(f"""
         <item>
         <title>{escape(title)}</title>
         <link>{escape(link)}</link>
         <guid>{escape(link)}</guid>
-        <description>{escape(title)}</description>
+        <description>{escape(description)}</description>
         </item>""")
 
     print("""

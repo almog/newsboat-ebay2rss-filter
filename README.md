@@ -5,6 +5,8 @@ For a while an altenative endpoint [/dsc](https://community.ebay.com/t5/Share-eB
 
 # What?
 This is really just a Newsboat _filter_ that translates ebay search results into an RSS feed
+Item descriptions include price, condition, listing type, and shipping details
+when eBay provides them.
 
 # But why is this Newboat specific, why not something more generic?
 You're right to ask that, my initial thought was to write a lightweight translation service (an http proxy) that takes an ebay URL and seemlessly returns a feed.

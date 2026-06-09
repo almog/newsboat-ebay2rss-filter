@@ -67,8 +67,109 @@ class FilterTest(unittest.TestCase):
         )
         self.assertEqual(items[0].findtext("guid"), items[0].findtext("link"))
         self.assertEqual(
-            items[0].findtext("description"), items[0].findtext("title")
+            items[0].findtext("description"),
+            (
+                "Programming & Testing Handbook\n"
+                "Price: ILS 186.02\n"
+                "Condition: Brand New\n"
+                "Listing type: Buy It Now\n"
+                "Shipping: +ILS 24.50 delivery"
+            ),
         )
+        self.assertNotIn("56 watchers", items[0].findtext("description"))
+
+    def test_omits_optional_condition_and_shipping(self):
+        html = (
+            FIXTURE.read_text(encoding="utf-8")
+            .replace("s-card__subtitle-row", "removed-subtitle-row")
+            .replace("+ILS 24.50 delivery", "Free returns")
+        )
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "ebay2rss_filter.py")],
+            input=html,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+
+        description = (
+            ET.fromstring(result.stdout)
+            .find("channel")
+            .find("item")
+            .findtext("description")
+        )
+        self.assertEqual(
+            description,
+            (
+                "Programming & Testing Handbook\n"
+                "Price: ILS 186.02\n"
+                "Listing type: Buy It Now"
+            ),
+        )
+
+    def test_normalizes_fixed_price_best_offer_listing_type(self):
+        html = FIXTURE.read_text(encoding="utf-8").replace(
+            "Buy It Now",
+            "or Best Offer",
+            1,
+        )
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "ebay2rss_filter.py")],
+            input=html,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+
+        description = (
+            ET.fromstring(result.stdout)
+            .find("channel")
+            .find("item")
+            .findtext("description")
+        )
+        self.assertIn(
+            "Listing type: Buy It Now · Best Offer",
+            description,
+        )
+
+    def test_normalizes_combined_listing_types(self):
+        html = FIXTURE.read_text(encoding="utf-8").replace(
+            (
+                '<span class="su-styled-text secondary large">'
+                "Buy It Now</span>"
+            ),
+            (
+                '<span class="su-styled-text secondary large">'
+                "3 bids · Time left 2h left</span></div>"
+                '<div class="s-card__attribute-row">'
+                '<span class="su-styled-text secondary large">'
+                "Buy It Now</span></div>"
+                '<div class="s-card__attribute-row">'
+                '<span class="su-styled-text secondary large">'
+                "or Best Offer</span>"
+            ),
+            1,
+        )
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "ebay2rss_filter.py")],
+            input=html,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+
+        description = (
+            ET.fromstring(result.stdout)
+            .find("channel")
+            .find("item")
+            .findtext("description")
+        )
+        self.assertIn(
+            "Listing type: Bid · Buy It Now · Best Offer",
+            description,
+        )
+        self.assertNotIn("3 bids", description)
+        self.assertNotIn("Time left", description)
 
     def test_excludes_suggested_results_when_no_exact_matches_exist(self):
         result = subprocess.run(
@@ -339,6 +440,12 @@ class LiveFilterTest(unittest.TestCase):
         items = channel.findall("item")
         self.assertIn("book", channel.findtext("title").lower())
         self.assertGreater(len(items), 0)
+        descriptions = [item.findtext("description") for item in items]
+        for label in ("Price", "Condition", "Listing type", "Shipping"):
+            self.assertTrue(
+                any(f"\n{label}: " in description for description in descriptions),
+                f"no live item description included {label.lower()} details",
+            )
 
         # Read eBay's source metadata independently, then prove that none of the
         # promoted listing IDs survived conversion into RSS items.
