@@ -149,7 +149,7 @@ try:
 
     has_exact_results = all(not document.css(f':contains("{text}")') for text in no_exact_match_texts)
 
-    feed_description = feed_title = document.css('input[name="_nkw"]').attrib['value']
+    feed_title = document.css('input[name="_nkw"]').attrib['value']
     feed_link = extract_feed_link(raw_html)
 
     # eBay embeds search state in a script shaped like:
@@ -213,7 +213,7 @@ try:
         feed_items.append((title, link, description))
 
     print(f"""<?xml version="1.0" encoding="UTF-8"?>
-    <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <rss version="2.0">
     <channel>
     <title>{escape(feed_title)}</title>
     <description>{escape(feed_title)}</description>
