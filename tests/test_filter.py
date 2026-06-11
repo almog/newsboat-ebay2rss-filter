@@ -223,6 +223,45 @@ class FilterTest(unittest.TestCase):
         channel = ET.fromstring(result.stdout).find("channel")
         self.assertEqual(len(channel.findall("item")), 1)
 
+    def test_excludes_results_matching_fewer_words(self):
+        html = (
+            FIXTURE.read_text(encoding="utf-8")
+            .replace(
+                (
+                    '<li class="s-card s-card--horizontal" '
+                    'data-listingid="100000000002">'
+                ),
+                (
+                    '<li class="srp-river-answer '
+                    'srp-river-answer--REWRITE_START">'
+                    "Results matching fewer words"
+                    "</li>"
+                    '<li class="s-card s-card--horizontal" '
+                    'data-listingid="100000000002">'
+                ),
+                1,
+            )
+            .replace(
+                ',\n          {"itemId":100000000002,"promoted":true}',
+                "",
+                1,
+            )
+        )
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "ebay2rss_filter.py")],
+            input=html,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+
+        items = ET.fromstring(result.stdout).find("channel").findall("item")
+        self.assertEqual(len(items), 1)
+        self.assertEqual(
+            items[0].findtext("link"),
+            "https://www.ebay.com/itm/100000000001",
+        )
+
     def test_escapes_search_query_in_channel_metadata(self):
         html = FIXTURE.read_text(encoding="utf-8").replace(
             'name="_nkw" value="book"',
@@ -391,30 +430,20 @@ class FilterTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("eBay listing metadata not found", result.stderr)
 
-    def test_rejects_result_missing_from_promotion_metadata(self):
+    def test_rejects_result_missing_from_listing_metadata(self):
         html = FIXTURE.read_text(encoding="utf-8").replace(
             ',\n          {"itemId":100000000002,"promoted":true}',
             "",
             1,
         )
-        with tempfile.TemporaryDirectory() as home:
-            result = subprocess.run(
-                [sys.executable, str(ROOT / "ebay2rss_filter.py")],
-                input=html,
-                text=True,
-                capture_output=True,
-                env={
-                    **os.environ,
-                    "HOME": home,
-                    "PYTHONPATH": os.pathsep.join(sys.path),
-                },
-            )
+        result = self.run_filter_with_isolated_home(html)
 
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn(
-                "eBay listing metadata missing for 100000000002",
-                result.stderr,
-            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
+        self.assertIn(
+            "eBay listing metadata missing for 100000000002",
+            result.stderr,
+        )
 
     def test_rejects_incomplete_result_before_emitting_rss(self):
         html = FIXTURE.read_text(encoding="utf-8").replace(

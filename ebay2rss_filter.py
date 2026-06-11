@@ -133,6 +133,26 @@ def format_item_description(title, details):
     return "\n".join(lines)
 
 
+def extract_exact_result_items(document):
+    items = document.css("li.s-card[data-listingid]")
+
+    # eBay can append a "Results matching fewer words" section to the same
+    # result list. Those cards are not exact matches and are absent from the
+    # exact-result metadata. Exclude them at the DOM boundary so metadata
+    # validation below remains strict for every eligible feed card.
+    fewer_words_boundary_xpath = (
+        'preceding-sibling::li[contains('
+        'concat(" ", normalize-space(@class), " "), '
+        '" srp-river-answer--REWRITE_START "'
+        ")]"
+    )
+    return [
+        item
+        for item in items
+        if not item.xpath(fewer_words_boundary_xpath)
+    ]
+
+
 try:
     raw_html = sys.stdin.read()
     if not raw_html:
@@ -164,7 +184,7 @@ try:
         raw_html,
         re.DOTALL,
     )
-    items = [] if no_exact_results else document.css("li.s-card[data-listingid]")
+    items = [] if no_exact_results else extract_exact_result_items(document)
     if items and not listings_match:
         raise ValueError("eBay listing metadata not found")
 
@@ -178,8 +198,6 @@ try:
         for item in items
         if item.css(".s-card__title .su-styled-text::text").get() != "Shop on eBay"
     }
-    # Assume every result ID is represented in this metadata. If that subset
-    # relationship breaks, eBay's metadata structure or its meaning has changed.
     missing_listing_ids = result_listing_ids - listing_metadata_ids
     if missing_listing_ids:
         missing_listing_id = sorted(missing_listing_ids)[0]
