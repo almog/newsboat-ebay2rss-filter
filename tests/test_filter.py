@@ -201,6 +201,28 @@ class FilterTest(unittest.TestCase):
         )
         self.assertEqual(channel.findall("item"), [])
 
+    def test_keeps_results_after_streamlined_search_notice(self):
+        html = FIXTURE.read_text(encoding="utf-8").replace(
+            "<ul",
+            (
+                '<section class="section-notice">'
+                "We’ve streamlined your search results to show you the best "
+                "listings. See more results"
+                "</section><ul"
+            ),
+            1,
+        )
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "ebay2rss_filter.py")],
+            input=html,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+
+        channel = ET.fromstring(result.stdout).find("channel")
+        self.assertEqual(len(channel.findall("item")), 1)
+
     def test_escapes_search_query_in_channel_metadata(self):
         html = FIXTURE.read_text(encoding="utf-8").replace(
             'name="_nkw" value="book"',
@@ -298,6 +320,28 @@ class FilterTest(unittest.TestCase):
             log = log_path.read_text(encoding="utf-8")
             self.assertNotIn(raw_html, log)
             self.assertIn("Traceback", log)
+
+    def test_logs_errors_to_configured_path(self):
+        with tempfile.TemporaryDirectory() as home:
+            log_path = Path(home) / "slowlog"
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "ebay2rss_filter.py")],
+                input="invalid response",
+                text=True,
+                capture_output=True,
+                env={
+                    **os.environ,
+                    "HOME": home,
+                    "PYTHONPATH": os.pathsep.join(sys.path),
+                    "EBAY2RSS_LOG": str(log_path),
+                },
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Traceback", log_path.read_text(encoding="utf-8"))
+            self.assertFalse(
+                (Path(home) / ".newsboat" / "ebay2rss.log").exists()
+            )
 
     def test_does_not_log_keyboard_interrupt(self):
         with (
@@ -424,6 +468,17 @@ class FilterTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Ebay temporary error page returned", result.stderr)
+
+    def test_rejects_ebay_anti_bot_challenge(self):
+        html = (
+            "<html><head><title>Pardon Our Interruption...</title></head>"
+            "<body>Checking your browser before accessing eBay.</body></html>"
+        )
+        result = self.run_filter_with_isolated_home(html)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("eBay anti-bot challenge page returned", result.stderr)
 
 
 @unittest.skipUnless(

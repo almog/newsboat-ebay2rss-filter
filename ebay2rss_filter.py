@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import os
 import sys
 import traceback
 import re
@@ -138,16 +139,17 @@ try:
         raise ValueError("Filter input must not be empty")
 
     document = Selector(text=raw_html)
+    if document.css("title::text").get() == "Pardon Our Interruption...":
+        raise ValueError("eBay anti-bot challenge page returned")
     if document.css(
         'div :contains("There seems to be a problem serving the request at this time")'
     ):
         raise ValueError("Ebay temporary error page returned")
 
-    no_exact_match_texts = (
-            'We’ve streamlined your search results to show you the best listings',
-            'No exact matches found')
-
-    has_exact_results = all(not document.css(f':contains("{text}")') for text in no_exact_match_texts)
+    no_exact_results = any(
+        normalized_text(heading) == "No exact matches found"
+        for heading in document.css(".srp-save-null-search__heading")
+    )
 
     feed_title = document.css('input[name="_nkw"]').attrib['value']
     feed_link = extract_feed_link(raw_html)
@@ -162,7 +164,7 @@ try:
         raw_html,
         re.DOTALL,
     )
-    items = document.css('li.s-card[data-listingid]') if has_exact_results else []
+    items = [] if no_exact_results else document.css("li.s-card[data-listingid]")
     if items and not listings_match:
         raise ValueError("eBay listing metadata not found")
 
@@ -233,7 +235,12 @@ try:
     </rss>""")
 
 except Exception as err:
-    log_path = Path.home() / ".newsboat" / "ebay2rss.log"
+    log_path = Path(
+        os.environ.get(
+            "EBAY2RSS_LOG",
+            Path.home() / ".newsboat" / "ebay2rss.log",
+        )
+    ).expanduser()
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a", encoding="utf-8") as log:
         log.write(f'{sys.argv=}\n')
